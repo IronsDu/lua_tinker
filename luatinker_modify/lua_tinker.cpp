@@ -137,9 +137,9 @@ void lua_tinker::init_u64(lua_State *L)
 	lua_pushcclosure(L, tostring_u64, 0);
 	lua_rawset(L, -3);
 
-	lua_pushstring(L, "__eq");
-	lua_pushcclosure(L, eq_u64, 0);
-	lua_rawset(L, -3);	
+    lua_pushstring(L, "__eq");
+    lua_pushcclosure(L, eq_u64, 0);
+    lua_rawset(L, -3);	
 
 	lua_pushstring(L, "__lt");
 	lua_pushcclosure(L, lt_u64, 0);

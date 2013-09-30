@@ -918,6 +918,15 @@ namespace lua_tinker
 	int meta_set(lua_State *L);
 	void push_meta(lua_State *L, const char* name);
 
+    template<typename T>
+    static int eq_cppobj(lua_State *L)
+    {
+        ptr2user<T>* a = (ptr2user<T>*)lua_touserdata(L, 1);
+        ptr2user<T>* b = (ptr2user<T>*)lua_touserdata(L, 2);
+        lua_pushboolean(L, a->m_p == b->m_p);
+        return 1;
+    }
+
 	// class init
 	template<typename T>
 	void class_add(lua_State* L, const char* name) 
@@ -942,6 +951,10 @@ namespace lua_tinker
 		lua_pushstring(L, "__gc");
 		lua_pushcclosure(L, destroyer<T>, 0);
 		lua_rawset(L, -3);
+
+        lua_pushstring(L, "__eq");
+        lua_pushcclosure(L, eq_cppobj<T>, 0);
+        lua_rawset(L, -3);	
 
 		lua_settable(L, LUA_GLOBALSINDEX);
 	}
