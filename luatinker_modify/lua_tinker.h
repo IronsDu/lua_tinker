@@ -12,6 +12,7 @@
 #pragma warning (disable:4996)
 
 #include <new>
+#include <string>
 #include <string.h>
 
 namespace lua_tinker
@@ -300,6 +301,8 @@ namespace lua_tinker
 	template<>	void push(lua_State *L, double ret);
 	template<>	void push(lua_State *L, char* ret);
 	template<>	void push(lua_State *L, const char* ret);
+    template<>  void push(lua_State *L, std::string ret);
+    template<>  void push(lua_State *L, const std::string& ret);
 	template<>	void push(lua_State *L, bool ret);
 	template<>	void push(lua_State *L, lua_value* ret);
 	template<>	void push(lua_State *L, long long ret);

@@ -506,6 +506,18 @@ void lua_tinker::push(lua_State *L, const char* ret)
 }
 
 template<>
+void lua_tinker::push(lua_State *L, std::string ret)
+{
+    lua_pushstring(L, ret.c_str());
+}
+
+template<>
+void lua_tinker::push(lua_State *L, const std::string& ret)
+{
+    lua_pushstring(L, ret.c_str());
+}
+
+template<>
 void lua_tinker::push(lua_State *L, bool ret)
 {
 	lua_pushboolean(L, ret);						
