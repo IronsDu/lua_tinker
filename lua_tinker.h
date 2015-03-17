@@ -186,22 +186,9 @@ namespace lua_tinker
 	template<typename T>
 	struct val2user : user
 	{
-		val2user() : user(new T) {}
-
-		template<typename T1>
-		val2user(T1 t1) : user(new T(t1)) {}
-
-		template<typename T1, typename T2>
-		val2user(T1 t1, T2 t2) : user(new T(t1, t2)) {}
-
-		template<typename T1, typename T2, typename T3>
-		val2user(T1 t1, T2 t2, T3 t3) : user(new T(t1, t2, t3)) {}
-
-		template<typename T1, typename T2, typename T3, typename T4>
-		val2user(T1 t1, T2 t2, T3 t3, T4 t4) : user(new T(t1, t2, t3,t4)) {}
-
-		template<typename T1, typename T2, typename T3, typename T4, typename T5>
-		val2user(T1 t1, T2 t2, T3 t3, T4 t4, T5 t5) : user(new T(t1, t2, t3,t4,t5)) {}
+		//val2user() : user(new T) {}
+        template<typename ...Args>
+        val2user(Args&& ...args) : user(new T(args...)) {}
 
 		~val2user() { delete ((T*)m_p); }
 	};
@@ -310,128 +297,66 @@ namespace lua_tinker
 	template<>	void	pop(lua_State *L);
 	template<>	table	pop(lua_State *L);
 
-	// functor (with return value)
-	template<typename RVal, typename T1=void, typename T2=void, typename T3=void, typename T4=void, typename T5=void>
-	struct functor
-	{
-		static int invoke(lua_State *L) { push<RVal>(L,upvalue_<RVal(*)(T1,T2,T3,T4,T5)>(L)(read<T1>(L,1),read<T2>(L,2),read<T3>(L,3),read<T4>(L,4),read<T5>(L,5))); return 1; }
-	};
-
-	template<typename RVal, typename T1, typename T2, typename T3, typename T4>
-	struct functor<RVal,T1,T2,T3,T4> 
-	{
-		static int invoke(lua_State *L) { push<RVal>(L,upvalue_<RVal(*)(T1,T2,T3,T4)>(L)(read<T1>(L,1),read<T2>(L,2),read<T3>(L,3),read<T4>(L,4))); return 1; }
-	};
-
-	template<typename RVal, typename T1, typename T2, typename T3>
-	struct functor<RVal,T1,T2,T3> 
-	{
-		static int invoke(lua_State *L) { push<RVal>(L,upvalue_<RVal(*)(T1,T2,T3)>(L)(read<T1>(L,1),read<T2>(L,2),read<T3>(L,3))); return 1; }
-	};
-
-	template<typename RVal, typename T1, typename T2>
-	struct functor<RVal,T1,T2> 
-	{
-        static int invoke(lua_State *L) { push<RVal>(L,upvalue_<RVal(*)(T1,T2)>(L)(read<T1>(L,1),read<T2>(L,2))); return 1; }
+    template<int SIZE, typename RVal, typename ...Args>
+    struct Eval
+    {
+        template<typename T, typename ...LeftArgs, typename ...NowArgs>
+        static  void    eval(RVal(*f)(Args...), lua_State *L, NowArgs&&... args)
+        {
+            T tmp = read<T>(L, sizeof...(Args)-sizeof...(LeftArgs));
+            Eval<sizeof...(LeftArgs), RVal, Args...>::eval<LeftArgs...>(f, L, args..., tmp);
+        }
     };
 
-    template<typename RVal, typename T1>
-    struct functor<RVal,T1> 
+    template<typename RVal, typename ...Args>
+    struct Eval<0, RVal, Args...>
     {
-        static int invoke(lua_State *L) { push<RVal>(L,upvalue_<RVal(*)(T1)>(L)(read<T1>(L,1))); return 1; }
-	};
+        template<typename ...NowArgs>
+        static  void    eval(RVal(*f)(Args...), lua_State *L, NowArgs&&... args)
+        {
+            RVal ret = (f)(args...);
+            push<RVal>(L, ret);
+        }
+    };
 
-	template<typename RVal>
-	struct functor<RVal>
-	{
-		static int invoke(lua_State *L) { push<RVal>(L,upvalue_<RVal(*)()>(L)()); return 1; }
-	};
+    template<typename ...Args>
+    struct Eval<0, void, Args...>
+    {
+        template<typename ...NowArgs>
+        static  void    eval(void(*f)(Args...), lua_State *L, NowArgs&&... args)
+        {
+            (f)(args...);
+        }
+    };
 
-	// functor (without return value)
-	template<typename T1, typename T2, typename T3, typename T4, typename T5>
-	struct functor<void, T1, T2, T3, T4, T5>
-	{
-		static int invoke(lua_State *L) { upvalue_<void(*)(T1,T2,T3,T4,T5)>(L)(read<T1>(L,1),read<T2>(L,2),read<T3>(L,3),read<T4>(L,4),read<T5>(L,5)); return 0; }
-	};
+    // functor (with return value)
+    template<typename RVal, typename ...Args>
+    struct functor
+    {
+        static int invoke(lua_State *L)
+        {
+            auto f = upvalue_<RVal(*)(Args...)>(L);
+            Eval<sizeof...(Args), RVal, Args...>::eval<Args...>(f, L);
+            return 1;
+        }
+    };
 
-	template<typename T1, typename T2, typename T3, typename T4>
-	struct functor<void, T1, T2, T3, T4>
-	{
-		static int invoke(lua_State *L) { upvalue_<void(*)(T1,T2,T3,T4)>(L)(read<T1>(L,1),read<T2>(L,2),read<T3>(L,3),read<T4>(L,4)); return 0; }
-	};
-
-	template<typename T1, typename T2, typename T3>
-	struct functor<void, T1, T2, T3>
-	{
-		static int invoke(lua_State *L) { upvalue_<void(*)(T1,T2,T3)>(L)(read<T1>(L,1),read<T2>(L,2),read<T3>(L,3)); return 0; }
-	};
-
-	template<typename T1, typename T2>
-	struct functor<void, T1, T2>
-	{
-		static int invoke(lua_State *L) { upvalue_<void(*)(T1,T2)>(L)(read<T1>(L,1),read<T2>(L,2)); return 0; }
-	};
-
-	template<typename T1>
-	struct functor<void, T1>
-	{
-		static int invoke(lua_State *L) { upvalue_<void(*)(T1)>(L)(read<T1>(L,1)); return 0; }
-	};
-
-	template<>
-	struct functor<void>
-	{
-		static int invoke(lua_State *L) { upvalue_<void(*)()>(L)(); return 0; }
-	};
-
-	// functor (non-managed)
-	template<typename T1>
-	struct functor<int, lua_State*, T1>
-	{
-		static int invoke(lua_State *L) { return upvalue_<int(*)(lua_State*,T1)>(L)(L,read<T1>(L,1)); }
-	};
-
-	template<>
-	struct functor<int,lua_State*>
-	{
-		static int invoke(lua_State *L) { return upvalue_<int(*)(lua_State*)>(L)(L); }
-	};
+    template<typename ...Args>
+    struct functor<void, Args...>
+    {
+        static int invoke(lua_State *L)
+        {
+            auto f = upvalue_<void(*)(Args...)>(L);
+            Eval<sizeof...(Args), void, Args...>::eval<Args...>(f, L);
+            return 0;
+        }
+    };
 
 	// push_functor
-	template<typename RVal> 
-	void push_functor(lua_State *L, RVal (*func)())
+    template<typename RVal, typename ...Args>
+    void push_functor(lua_State *L, RVal(*func)(Args...))
 	{
-		lua_pushcclosure(L, functor<RVal>::invoke, 1);
-	}
-
-	template<typename RVal, typename T1> 
-	void push_functor(lua_State *L, RVal (*func)(T1))
-	{ 
-		lua_pushcclosure(L, functor<RVal,T1>::invoke, 1);
-	}
-
-	template<typename RVal, typename T1, typename T2> 
-	void push_functor(lua_State *L, RVal (*func)(T1,T2))
-	{ 
-		lua_pushcclosure(L, functor<RVal,T1,T2>::invoke, 1);
-	}
-
-	template<typename RVal, typename T1, typename T2, typename T3> 
-	void push_functor(lua_State *L, RVal (*func)(T1,T2,T3))
-	{ 
-		lua_pushcclosure(L, functor<RVal,T1,T2,T3>::invoke, 1);
-	}
-
-	template<typename RVal, typename T1, typename T2, typename T3, typename T4> 
-	void push_functor(lua_State *L, RVal (*func)(T1,T2,T3,T4))
-	{ 
-		lua_pushcclosure(L, functor<RVal,T1,T2,T3,T4>::invoke, 1);
-	}
-
-	template<typename RVal, typename T1, typename T2, typename T3, typename T4, typename T5> 
-	void push_functor(lua_State *L, RVal (*func)(T1,T2,T3,T4,T5))
-	{ 
-		lua_pushcclosure(L, functor<RVal,T1,T2,T3,T4,T5>::invoke, 1);
+        lua_pushcclosure(L, functor<RVal, Args...>::invoke, 1);
 	}
 
 	// member variable
@@ -450,221 +375,103 @@ namespace lua_tinker
 		void set(lua_State *L)	{ read<T*>(L,1)->*(_var) = read<V>(L, 3);	}
 	};
 
-	// class member functor (with return value)
-	template<typename RVal, typename T, typename P, typename T1=void, typename T2=void, typename T3=void, typename T4=void, typename T5=void>
-	struct mem_functor
-	{
-		static int invoke(lua_State *L) { push<RVal>(L,(((P*)read<T*>(L,1))->*upvalue_<RVal(P::*)(T1,T2,T3,T4,T5)>(L))(read<T1>(L,2),read<T2>(L,3),read<T3>(L,4),read<T4>(L,5),read<T5>(L,6)));; return 1; }
-	};
-
-	template<typename RVal, typename T, typename P, typename T1, typename T2, typename T3, typename T4> 
-	struct mem_functor<RVal,T,P, T1,T2,T3,T4>
-	{
-		static int invoke(lua_State *L) { push<RVal>(L,(((P*)read<T*>(L,1))->*upvalue_<RVal(P::*)(T1,T2,T3,T4)>(L))(read<T1>(L,2),read<T2>(L,3),read<T3>(L,4),read<T4>(L,5))); return 1; }
-	};
-
-	template<typename RVal, typename T, typename P, typename T1, typename T2, typename T3> 
-	struct mem_functor<RVal,T,P,T1,T2,T3>
-	{
-		static int invoke(lua_State *L) { push<RVal>(L,(((P*)read<T*>(L,1))->*upvalue_<RVal(P::*)(T1,T2,T3)>(L))(read<T1>(L,2),read<T2>(L,3),read<T3>(L,4))); return 1; }
-	};
-
-	template<typename RVal, typename T, typename P, typename T1, typename T2> 
-	struct mem_functor<RVal,T,P,T1, T2>
-	{
-        static int invoke(lua_State *L) { push<RVal>(L,(((P*)read<T*>(L,1))->*upvalue_<RVal(P::*)(T1,T2)>(L))(read<T1>(L,2),read<T2>(L,3))); return 1; }
+    template<int SIZE, typename RVal, typename P, typename ...Args>
+    struct MemEval
+    {
+        template<typename T, typename ...LeftArgs, typename ...NowArgs>
+        static  void    eval(P* p, RVal(P::*f)(Args...), lua_State *L, NowArgs&&... args)
+        {
+            T tmp = read<T>(L, sizeof...(Args)-sizeof...(LeftArgs)+1);
+            MemEval<sizeof...(LeftArgs), RVal, P, Args...>::eval<LeftArgs...>(p, f, L, args..., tmp);
+        }
     };
 
-    template<typename RVal, typename T, typename P, typename T1> 
-    struct mem_functor<RVal,T,P,T1>
+    template<typename RVal, typename P, typename ...Args>
+    struct MemEval<0, RVal, P, Args...>
     {
-        static int invoke(lua_State *L) { push<RVal>(L,(((P*)read<T*>(L,1))->*upvalue_<RVal(P::*)(T1)>(L))(read<T1>(L,2))); return 1; }
-	};
+        template<typename ...NowArgs>
+        static  void    eval(P* p, RVal(P::*f)(Args...), lua_State *L, NowArgs&&... args)
+        {
+            RVal ret = (p->*f)(args...);
+            push<RVal>(L, ret);
+        }
+    };
 
-	template<typename RVal, typename T, typename P> 
-	struct mem_functor<RVal,T, P>
-	{
-		static int invoke(lua_State *L) { push<RVal>(L,(((P*)read<T*>(L,1))->*upvalue_<RVal(P::*)()>(L))()); return 1; }
-	};
+    template<typename P, typename ...Args>
+    struct MemEval<0, void, P, Args...>
+    {
+        template<typename ...NowArgs>
+        static  void    eval(P* p, void(P::*f)(Args...), lua_State *L, NowArgs&&... args)
+        {
+            (p->*f)(args...);
+        }
+    };
 
-	// class member functor (without return value)
-	template<typename T, typename P, typename T1, typename T2, typename T3, typename T4, typename T5>
-	struct mem_functor<void,T,P,T1,T2,T3,T4,T5>
-	{
-		static int invoke(lua_State *L)  { (((P*)read<T*>(L,1))->*upvalue_<void(P::*)(T1,T2,T3,T4,T5)>(L))(read<T1>(L,2),read<T2>(L,3),read<T3>(L,4),read<T4>(L,5),read<T5>(L,6)); return 0; }
-	};
+    // class member functor (with return value)
+    template<typename RVal, typename T, typename P, typename ...Args>
+    struct mem_functor
+    {
+        static int invoke(lua_State *L)
+        {
+            P* p = ((P*)read<T*>(L, 1));
+            auto f = upvalue_<RVal(P::*)(Args...)>(L);
+            MemEval<sizeof...(Args), RVal, P, Args...>::eval<Args...>(p, f, L);
+            return 1;
+        }
+    };
 
-	template<typename T, typename P, typename T1, typename T2, typename T3, typename T4>
-	struct mem_functor<void,T,P,T1,T2,T3,T4>
-	{
-		static int invoke(lua_State *L)  { (((P*)read<T*>(L,1))->*upvalue_<void(P::*)(T1,T2,T3,T4)>(L))(read<T1>(L,2),read<T2>(L,3),read<T3>(L,4),read<T4>(L,5)); return 0; }
-	};
-
-	template<typename T, typename P, typename T1, typename T2, typename T3>
-	struct mem_functor<void,T,P,T1,T2,T3>
-	{
-		static int invoke(lua_State *L)  { (((P*)read<T*>(L,1))->*upvalue_<void(P::*)(T1,T2,T3)>(L))(read<T1>(L,2),read<T2>(L,3),read<T3>(L,4)); return 0; }
-	};
-
-	template<typename T, typename P, typename T1, typename T2>
-	struct mem_functor<void,T,P,T1,T2>
-	{
-		static int invoke(lua_State *L)  { (((P*)read<T*>(L,1))->*upvalue_<void(P::*)(T1,T2)>(L))(read<T1>(L,2),read<T2>(L,3)); return 0; }
-	};
-
-	template<typename T, typename P, typename T1>
-	struct mem_functor<void,T,P,T1>
-	{
-		static int invoke(lua_State *L)  { (((P*)read<T*>(L,1))->*upvalue_<void(P::*)(T1)>(L))(read<T1>(L,2)); return 0; }
-	};
-
-	template<typename T, typename P>
-	struct mem_functor<void,T,P>
-	{
-		static int invoke(lua_State *L)  { (((P*)read<T*>(L,1))->*upvalue_<void(P::*)()>(L))(); return 0; }
-	};
-
-	// class member functor (non-managed)
-	template<typename T, typename P, typename T1> 
-	struct mem_functor<int,T,P,lua_State*,T1>
-	{
-		static int invoke(lua_State *L) { return (((P*)read<T*>(L,1))->*upvalue_<int(P::*)(lua_State*,T1)>(L))(L, read<T1>(L,2)); }
-	};
-
-	template<typename T, typename P> 
-	struct mem_functor<int,T,P,lua_State*>
-	{
-		static int invoke(lua_State *L) { return (((P*)read<T*>(L,1))->*upvalue_<int(P::*)(lua_State*)>(L))(L); }
-	};
+    template<typename T, typename P, typename ...Args>
+    struct mem_functor<void, T, P, Args...>
+    {
+        static int invoke(lua_State *L)
+        {
+            P* p = ((P*)read<T*>(L, 1));
+            auto f = upvalue_<void(P::*)(Args...)>(L);
+            MemEval<sizeof...(Args), void, P, Args...>::eval<Args...>(p, f, L);
+            return 0;
+        }
+    };
 
 	// push_functor
-	template<typename T, typename RVal, typename P>
-	void push_mem_functor(lua_State *L, RVal (P::*func)()) 
-	{ 
-		lua_pushcclosure(L, mem_functor<RVal,T, P>::invoke, 1); 
-	}
+    template<typename T, typename RVal, typename P, typename ...Args>
+    void push_mem_functor(lua_State *L, RVal(P::*func)(Args...))
+    {
+        lua_pushcclosure(L, mem_functor<RVal, T, P, Args...>::invoke, 1);
+    }
 
-	template<typename T, typename RVal, typename P>
-	void push_mem_functor(lua_State *L, RVal (P::*func)() const) 
-	{ 
-		lua_pushcclosure(L, mem_functor<RVal,T, P>::invoke, 1); 
-	}
+    template<typename T, typename RVal, typename P, typename ...Args>
+    void push_mem_functor(lua_State *L, RVal(P::*func)(Args...) const)
+    {
+        lua_pushcclosure(L, mem_functor<RVal, T, P, Args...>::invoke, 1);
+    }
 
-	template<typename T, typename RVal, typename P, typename T1>
-	void push_mem_functor(lua_State *L, RVal (P::*func)(T1)) 
-	{ 
-		lua_pushcclosure(L, mem_functor<RVal,T, P,T1>::invoke, 1); 
-	}
+    template<int SIZE, typename T, typename ...Args>
+    struct ConstructorEval
+    {
+        template<typename A, typename ...LeftArgs, typename ...NowArgs>
+        static  void    eval(void* memory, lua_State *L, NowArgs&&... args)
+        {
+            A tmp = read<A>(L, sizeof...(Args)-sizeof...(LeftArgs)+1);
+            ConstructorEval<sizeof...(LeftArgs), T, Args...>::eval<LeftArgs...>(memory, L, args..., tmp);
+        }
+    };
 
-	template<typename T, typename RVal, typename P, typename T1>
-	void push_mem_functor(lua_State *L, RVal (P::*func)(T1) const) 
-	{ 
-		lua_pushcclosure(L, mem_functor<RVal,T, P,T1>::invoke, 1); 
-	}
-
-	template<typename T, typename RVal, typename P, typename T1, typename T2>
-	void push_mem_functor(lua_State *L, RVal (P::*func)(T1,T2)) 
-	{ 
-		lua_pushcclosure(L, mem_functor<RVal,T, P,T1,T2>::invoke, 1); 
-	}
-
-	template<typename T, typename RVal, typename P, typename T1, typename T2>
-	void push_mem_functor(lua_State *L, RVal (P::*func)(T1,T2) const) 
-	{ 
-		lua_pushcclosure(L, mem_functor<RVal,T, P,T1,T2>::invoke, 1); 
-	}
-
-	template<typename T, typename RVal, typename P, typename T1, typename T2, typename T3>
-	void push_mem_functor(lua_State *L, RVal (P::*func)(T1,T2,T3)) 
-	{ 
-		lua_pushcclosure(L, mem_functor<RVal,T, P,T1,T2,T3>::invoke, 1); 
-	}
-
-	template<typename T, typename RVal, typename P, typename T1, typename T2, typename T3>
-	void push_mem_functor(lua_State *L, RVal (P::*func)(T1,T2,T3) const) 
-	{ 
-		lua_pushcclosure(L, mem_functor<RVal,T, P,T1,T2,T3>::invoke, 1); 
-	}
-
-	template<typename T, typename RVal, typename P, typename T1, typename T2, typename T3, typename T4>
-	void push_mem_functor(lua_State *L, RVal (P::*func)(T1,T2,T3,T4)) 
-	{ 
-		lua_pushcclosure(L, mem_functor<RVal,T, P,T1,T2,T3,T4>::invoke, 1); 
-	}
-
-	template<typename T, typename RVal, typename P, typename T1, typename T2, typename T3, typename T4>
-	void push_mem_functor(lua_State *L, RVal (P::*func)(T1,T2,T3,T4) const) 
-	{ 
-		lua_pushcclosure(L, mem_functor<RVal,T, P,T1,T2,T3,T4>::invoke, 1); 
-	}
-
-	template<typename T, typename RVal, typename P, typename T1, typename T2, typename T3, typename T4, typename T5>
-	void push_mem_functor(lua_State *L, RVal (P::*func)(T1,T2,T3,T4,T5)) 
-	{ 
-		lua_pushcclosure(L, mem_functor<RVal,T, P,T1,T2,T3,T4,T5>::invoke, 1); 
-	}
-
-	template<typename T, typename RVal, typename P, typename T1, typename T2, typename T3, typename T4, typename T5>
-	void push_mem_functor(lua_State *L, RVal (P::*func)(T1,T2,T3,T4,T5) const) 
-	{ 
-		lua_pushcclosure(L, mem_functor<RVal,T, P,T1,T2,T3,T4,T5>::invoke, 1); 
-	}
+    template<typename T, typename ...Args>
+    struct ConstructorEval<0, T, Args...>
+    {
+        template<typename ...NowArgs>
+        static  void    eval(void* memory, lua_State *L, NowArgs&&... args)
+        {
+            new(memory)val2user<T>(args...);
+        }
+    };
 
 	// constructor
-	template<typename T, typename T1, typename T2, typename T3, typename T4, typename T5>
+	template<typename T, typename ...Args>
 	int constructor(lua_State *L) 
 	{ 
-		new(lua_newuserdata(L, sizeof(val2user<T>))) val2user<T>(read<T1>(L,2),read<T2>(L,3),read<T3>(L,4),read<T4>(L,5),read<T5>(L,6));
-		push_meta(L, class_name<typename class_type<T>::type>::name());
-		lua_setmetatable(L, -2);
-
-		return 1; 
-	}
-
-	template<typename T, typename T1, typename T2, typename T3, typename T4>
-	int constructor(lua_State *L) 
-	{ 
-		new(lua_newuserdata(L, sizeof(val2user<T>))) val2user<T>(read<T1>(L,2),read<T2>(L,3),read<T3>(L,4),read<T4>(L,5));
-		push_meta(L, class_name<typename class_type<T>::type>::name());
-		lua_setmetatable(L, -2);
-
-		return 1; 
-	}
-
-	template<typename T, typename T1, typename T2, typename T3>
-	int constructor(lua_State *L) 
-	{ 
-		new(lua_newuserdata(L, sizeof(val2user<T>))) val2user<T>(read<T1>(L,2),read<T2>(L,3),read<T3>(L,4));
-		push_meta(L, class_name<typename class_type<T>::type>::name());
-		lua_setmetatable(L, -2);
-
-		return 1; 
-	}
-
-	template<typename T, typename T1, typename T2>
-	int constructor(lua_State *L) 
-	{ 
-		new(lua_newuserdata(L, sizeof(val2user<T>))) val2user<T>(read<T1>(L,2),read<T2>(L,3));
-		push_meta(L, class_name<typename class_type<T>::type>::name());
-		lua_setmetatable(L, -2);
-
-		return 1; 
-	}
-
-	template<typename T, typename T1>
-	int constructor(lua_State *L) 
-	{ 
-		new(lua_newuserdata(L, sizeof(val2user<T>))) val2user<T>(read<T1>(L,2));
-		push_meta(L, class_name<typename class_type<T>::type>::name());
-		lua_setmetatable(L, -2);
-
-		return 1; 
-	}
-
-	template<typename T>
-	int constructor(lua_State *L) 
-	{ 
-		new(lua_newuserdata(L, sizeof(val2user<T>))) val2user<T>();
+        void* m = lua_newuserdata(L, sizeof(val2user<T>));
+        ConstructorEval<sizeof...(Args), T, Args...>::eval<Args...>(m, L);
 		push_meta(L, class_name<typename class_type<T>::type>::name());
 		lua_setmetatable(L, -2);
 
@@ -712,194 +519,30 @@ namespace lua_tinker
 		set(L, name, object);
 	}
 
-	// call
-	template<typename RVal>
-	RVal call(lua_State* L, const char* name)
-	{
-		lua_pushcclosure(L, on_error, 0);
-		int errfunc = lua_gettop(L);
-
-		lua_pushstring(L, name);
-		lua_gettable(L, LUA_GLOBALSINDEX);
-
-		if(lua_isfunction(L,-1))
-		{
-			lua_pcall(L, 0, 1, errfunc);
-		}
-		else
-		{
-			print_error(L, "lua_tinker::call() attempt to call global `%s' (not a function)", name);
-		}
-
-		lua_remove(L, errfunc);
-		return pop<RVal>(L);
-	}
-
-	template<typename RVal, typename T1>
-	RVal call(lua_State* L, const char* name, T1 arg)
-	{
-		lua_pushcclosure(L, on_error, 0);
-		int errfunc = lua_gettop(L);
-
-		lua_pushstring(L, name);
-		lua_gettable(L, LUA_GLOBALSINDEX);
-		if(lua_isfunction(L,-1))
-		{
-			push(L, arg);
-			lua_pcall(L, 1, 1, errfunc);
-		}
-		else
-		{
-			print_error(L, "lua_tinker::call() attempt to call global `%s' (not a function)", name);
-		}
-
-		lua_remove(L, errfunc);
-		return pop<RVal>(L);
-	}
-
-	template<typename RVal, typename T1, typename T2>
-	RVal call(lua_State* L, const char* name, T1 arg1, T2 arg2)
-	{
-		lua_pushcclosure(L, on_error, 0);
-		int errfunc = lua_gettop(L);
-
-		lua_pushstring(L, name);
-		lua_gettable(L, LUA_GLOBALSINDEX);
-		if(lua_isfunction(L,-1))
-		{
-			push(L, arg1);
-			push(L, arg2);
-			lua_pcall(L, 2, 1, errfunc);
-		}
-		else
-		{
-			print_error(L, "lua_tinker::call() attempt to call global `%s' (not a function)", name);
-		}
-
-		lua_remove(L, errfunc);
-		return pop<RVal>(L);
-	}
-
-	template<typename RVal, typename T1, typename T2, typename T3>
-	RVal call(lua_State* L, const char* name, T1 arg1, T2 arg2, T3 arg3)
-	{
-		lua_pushcclosure(L, on_error, 0);
-		int errfunc = lua_gettop(L);
-
-		lua_pushstring(L, name);
-        lua_gettable(L, LUA_GLOBALSINDEX);
-        if(lua_isfunction(L,-1))
-		{
-			push(L, arg1);
-			push(L, arg2);
-			push(L, arg3);
-			lua_pcall(L, 3, 1, errfunc);
-		}
-		else
-		{
-			print_error(L, "lua_tinker::call() attempt to call global `%s' (not a function)", name);
-		}
-
-		lua_remove(L, errfunc);
-		return pop<RVal>(L);
-	}
-
-    template<typename RVal, typename T1, typename T2, typename T3, typename T4>
-    RVal call(lua_State* L, const char* name, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+    static  void    PushArgs(lua_State *L)
     {
-        lua_pushcclosure(L, on_error, 0);
-        int errfunc = lua_gettop(L);
-
-        lua_pushstring(L, name);
-        lua_gettable(L, LUA_GLOBALSINDEX);
-        if(lua_isfunction(L,-1))
-        {
-            push(L, arg1);
-            push(L, arg2);
-            push(L, arg3);
-            push(L, arg4);
-            lua_pcall(L, 4, 1, errfunc);
-        }
-        else
-        {
-            print_error(L, "lua_tinker::call() attempt to call global `%s' (not a function)", name);
-        }
-
-        lua_remove(L, errfunc);
-        return pop<RVal>(L);
     }
 
-    template<typename RVal, typename T1, typename T2, typename T3, typename T4, typename T5>
-    RVal call(lua_State* L, const char* name, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+    template<typename T, typename ...LeftArgs>
+    static  void    PushArgs(lua_State *L, T&& t, LeftArgs&&... args)
     {
-        lua_pushcclosure(L, on_error, 0);
-        int errfunc = lua_gettop(L);
-
-        lua_pushstring(L, name);
-        lua_gettable(L, LUA_GLOBALSINDEX);
-        if(lua_isfunction(L,-1))
-        {
-            push(L, arg1);
-            push(L, arg2);
-            push(L, arg3);
-            push(L, arg4);
-            push(L, arg5);
-            lua_pcall(L, 5, 1, errfunc);
-        }
-        else
-        {
-            print_error(L, "lua_tinker::call() attempt to call global `%s' (not a function)", name);
-        }
-
-        lua_remove(L, errfunc);
-        return pop<RVal>(L);
+        push(L, t);
+        PushArgs(L, args...);
     }
 
-    template<typename RVal, typename T1, typename T2, typename T3, typename T4, typename T5, typename T6>
-    RVal call(lua_State* L, const char* name, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+    // call
+    template<typename RVal, typename ...Args>
+    RVal call(lua_State* L, const char* name, Args&&... args)
     {
         lua_pushcclosure(L, on_error, 0);
         int errfunc = lua_gettop(L);
 
         lua_pushstring(L, name);
         lua_gettable(L, LUA_GLOBALSINDEX);
-        if(lua_isfunction(L,-1))
+        if (lua_isfunction(L, -1))
         {
-            push(L, arg1);
-            push(L, arg2);
-            push(L, arg3);
-            push(L, arg4);
-            push(L, arg5);
-            push(L, arg6);
-            lua_pcall(L, 6, 1, errfunc);
-        }
-        else
-        {
-            print_error(L, "lua_tinker::call() attempt to call global `%s' (not a function)", name);
-        }
-
-        lua_remove(L, errfunc);
-        return pop<RVal>(L);
-    }
-
-    template<typename RVal, typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7>
-    RVal call(lua_State* L, const char* name, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
-    {
-        lua_pushcclosure(L, on_error, 0);
-        int errfunc = lua_gettop(L);
-
-        lua_pushstring(L, name);
-        lua_gettable(L, LUA_GLOBALSINDEX);
-        if(lua_isfunction(L,-1))
-        {
-            push(L, arg1);
-            push(L, arg2);
-            push(L, arg3);
-            push(L, arg4);
-            push(L, arg5);
-            push(L, arg6);
-            push(L, arg7);
-            lua_pcall(L, 7, 1, errfunc);
+            PushArgs(L, args...);
+            lua_pcall(L, sizeof...(Args), 1, errfunc);
         }
         else
         {
