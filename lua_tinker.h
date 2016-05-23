@@ -372,6 +372,7 @@ namespace lua_tinker
     // member variable
     struct var_base
     {
+        virtual ~var_base(){}
         virtual void get(lua_State *L) = 0;
         virtual void set(lua_State *L) = 0;
     };
@@ -478,24 +479,43 @@ namespace lua_tinker
     template<typename F>
     void def(lua_State* L, const char* name, F func)
     {
+#if(LUA_VERSION_NUM == 501)
+        lua_pushstring(L, name);
+        lua_pushlightuserdata(L, (void*)func);
+        push_functor(L, func);
+        lua_settable(L, LUA_GLOBALSINDEX);
+#elif(LUA_VERSION_NUM == 503)
         lua_pushlightuserdata(L, (void*)func);
         push_functor(L, func);
         lua_setglobal(L, name);
+#endif
     }
 
     // global variable
     template<typename T>
     void set(lua_State* L, const char* name, T object)
     {
+#if(LUA_VERSION_NUM == 501)
+        lua_pushstring(L, name);
+        push(L, object);
+        lua_settable(L, LUA_GLOBALSINDEX);
+#elif(LUA_VERSION_NUM == 503)
         push(L, object);
         lua_setglobal(L, name);
+#endif
     }
 
     template<typename T>
     T get(lua_State* L, const char* name)
     {
+#if(LUA_VERSION_NUM == 501)
+        lua_pushstring(L, name);
+        lua_gettable(L, LUA_GLOBALSINDEX);
+        return pop<T>(L);
+#elif(LUA_VERSION_NUM == 503)
         lua_getglobal(L, name);
         return pop<T>(L);
+#endif
     }
 
     template<typename T>
@@ -521,7 +541,12 @@ namespace lua_tinker
     {
         lua_pushcclosure(L, on_error, 0);
         int errfunc = lua_gettop(L);
+#if(LUA_VERSION_NUM == 501)
+        lua_pushstring(L, name);
+        lua_gettable(L, LUA_GLOBALSINDEX);
+#elif (LUA_VERSION_NUM == 503)
         lua_getglobal(L, name);
+#endif
         if (lua_isfunction(L, -1))
         {
             PushArgs(L, args...);
@@ -564,6 +589,7 @@ namespace lua_tinker
     {
         class_name<T>::name(name);
 
+#if(LUA_VERSION_NUM == 501)
         lua_pushstring(L, name);
         lua_newtable(L);
 
@@ -588,6 +614,31 @@ namespace lua_tinker
         lua_rawset(L, -3);
 
         lua_settable(L, LUA_GLOBALSINDEX);
+#elif(LUA_VERSION_NUM == 503)
+        lua_newtable(L);
+
+        lua_pushstring(L, "__name");
+        lua_pushstring(L, name);
+        lua_rawset(L, -3);
+
+        lua_pushstring(L, "__index");
+        lua_pushcclosure(L, meta_get, 0);
+        lua_rawset(L, -3);
+
+        lua_pushstring(L, "__newindex");
+        lua_pushcclosure(L, meta_set, 0);
+        lua_rawset(L, -3);
+
+        lua_pushstring(L, "__gc");
+        lua_pushcclosure(L, destroyer<T>, 0);
+        lua_rawset(L, -3);
+
+        lua_pushstring(L, "__eq");
+        lua_pushcclosure(L, eq_cppobj<T>, 0);
+        lua_rawset(L, -3);
+
+        lua_setglobal(L, name);
+#endif
     }
 
     // Tinker Class Inheritence
