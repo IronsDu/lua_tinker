@@ -63,6 +63,7 @@ static int le_s64(lua_State *L)
 /*---------------------------------------------------------------------------*/
 void lua_tinker::init_s64(lua_State *L)
 {
+#if(LUA_VERSION_NUM == 501)
     const char* name = "__s64";
     lua_pushstring(L, name);
     lua_newtable(L);
@@ -88,6 +89,7 @@ void lua_tinker::init_s64(lua_State *L)
     lua_rawset(L, -3);
 
     lua_settable(L, LUA_GLOBALSINDEX);
+#endif
 }
 
 /*---------------------------------------------------------------------------*/
@@ -125,6 +127,7 @@ static int le_u64(lua_State *L)
 /*---------------------------------------------------------------------------*/
 void lua_tinker::init_u64(lua_State *L)
 {
+#if(LUA_VERSION_NUM == 501)
     const char* name = "__u64";
     lua_pushstring(L, name);
     lua_newtable(L);
@@ -150,6 +153,7 @@ void lua_tinker::init_u64(lua_State *L)
     lua_rawset(L, -3);
 
     lua_settable(L, LUA_GLOBALSINDEX);
+#endif
 }
 
 /*---------------------------------------------------------------------------*/
@@ -262,9 +266,13 @@ void lua_tinker::print_error(lua_State *L, const char* fmt, ...)
     va_start(args, fmt);
     vsprintf(text, fmt, args);
     va_end(args);
-
+#if(LUA_VERSION_NUM == 501)
     lua_pushstring(L, "_ALERT");
     lua_gettable(L, LUA_GLOBALSINDEX);
+#elif(LUA_VERSION_NUM == 503)
+    lua_getglobal(L, "_ALERT");
+#endif
+    
     if (lua_isfunction(L, -1))
     {
         lua_pushstring(L, text);
@@ -514,19 +522,19 @@ void lua_tinker::push(lua_State *L, const char* ret)
 template<>
 void lua_tinker::push(lua_State *L, std::string ret)
 {
-    lua_pushstring(L, ret.c_str());
+    lua_pushlstring(L, ret.c_str(), ret.size());
 }
 
 template<>
 void lua_tinker::push(lua_State *L, const std::string& ret)
 {
-    lua_pushstring(L, ret.c_str());
+    lua_pushlstring(L, ret.c_str(), ret.size());
 }
 
 template<>
 void lua_tinker::push(lua_State *L, std::string&& ret)
 {
-    lua_pushstring(L, ret.c_str());
+    lua_pushlstring(L, ret.c_str(), ret.size());
 }
 
 template<>
@@ -544,18 +552,27 @@ void lua_tinker::push(lua_State *L, lua_value* ret)
 template<>
 void lua_tinker::push(lua_State *L, long long ret)
 {
+#if(LUA_VERSION_NUM == 501)
     *(long long*)lua_newuserdata(L, sizeof(long long)) = ret;
     lua_pushstring(L, "__s64");
     lua_gettable(L, LUA_GLOBALSINDEX);
     lua_setmetatable(L, -2);
+#elif(LUA_VERSION_NUM == 503)
+    lua_pushinteger(L, ret);
+#endif
+
 }
 template<>
 void lua_tinker::push(lua_State *L, unsigned long long ret)
 {
+#if(LUA_VERSION_NUM == 501)
     *(unsigned long long*)lua_newuserdata(L, sizeof(unsigned long long)) = ret;
     lua_pushstring(L, "__u64");
     lua_gettable(L, LUA_GLOBALSINDEX);
     lua_setmetatable(L, -2);
+#elif(LUA_VERSION_NUM == 503)
+    lua_pushinteger(L, ret);
+#endif
 }
 
 template<>
@@ -655,8 +672,12 @@ int lua_tinker::meta_set(lua_State *L)
 /*---------------------------------------------------------------------------*/
 void lua_tinker::push_meta(lua_State *L, const char* name)
 {
+#if (LUA_VERSION_NUM == 501)
     lua_pushstring(L, name);
     lua_gettable(L, LUA_GLOBALSINDEX);
+#elif (LUA_VERSION_NUM == 503)
+    lua_getglobal(L, name);
+#endif
 }
 
 /*---------------------------------------------------------------------------*/
@@ -742,6 +763,7 @@ lua_tinker::table::table(lua_State* L)
 
 lua_tinker::table::table(lua_State* L, const char* name)
 {
+#if (LUA_VERSION_NUM == 501)
     lua_pushstring(L, name);
     lua_gettable(L, LUA_GLOBALSINDEX);
 
@@ -754,6 +776,19 @@ lua_tinker::table::table(lua_State* L, const char* name)
         lua_pushvalue(L, -2);
         lua_settable(L, LUA_GLOBALSINDEX);
     }
+#elif (LUA_VERSION_NUM == 503)
+    lua_getglobal(L, name);
+
+    if (lua_istable(L, -1) == 0)
+    {
+        lua_pop(L, 1);
+
+        lua_newtable(L);
+        lua_pushvalue(L, -1);
+        lua_setglobal(L, name);
+    }
+
+#endif
 
     m_obj = new table_obj(L, lua_gettop(L));
     m_obj->inc_ref();
