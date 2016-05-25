@@ -216,7 +216,7 @@ namespace lua_tinker
     struct ref2lua { static void invoke(lua_State *L, T& input){ new(lua_newuserdata(L, sizeof(ptr2user<T>))) ptr2user<T>(&input); } };
 
     template<typename T>
-    struct enum2lua { static void invoke(lua_State *L, T val) { lua_pushnumber(L, (int)val); } };
+    struct enum2lua { static void invoke(lua_State *L, T val) { lua_pushinteger(L, (int)val); } };
 
     template<typename T>
     struct object2lua
@@ -274,6 +274,7 @@ namespace lua_tinker
     template<>	unsigned long long	read(lua_State *L, int index);
     template<>	table				read(lua_State *L, int index);
     template<>	std::string		    read(lua_State *L, int index);
+    template<>	lua_State*		    read(lua_State *L, int index);
 
     // push a value to lua stack 
     template<typename T>
