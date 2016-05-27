@@ -392,7 +392,7 @@ namespace lua_tinker
     {
         static  void    eval(P* p, RVal(P::*f)(Args...), lua_State *L, Args&&... args)
         {
-            RecursionRead(L, 1, args...);
+            RecursionRead(L, 2, args...);
             RVal ret = (p->*f)(args...);
             push<RVal>(L, ret);
         }
@@ -403,7 +403,7 @@ namespace lua_tinker
     {
         static  void    eval(P* p, void(P::*f)(Args...), lua_State *L, Args&&... args)
         {
-            RecursionRead(L, 1, args...);
+            RecursionRead(L, 2, args...);
             (p->*f)(args...);
         }
     };
