@@ -218,6 +218,11 @@ namespace lua_tinker
     template<typename T>
     struct enum2lua { static void invoke(lua_State *L, T val) { lua_pushinteger(L, (int)val); } };
 
+    // class helper
+    int meta_get(lua_State *L);
+    int meta_set(lua_State *L);
+    void push_meta(lua_State *L, const char* name);
+
     template<typename T>
     struct object2lua
     {
@@ -561,11 +566,6 @@ namespace lua_tinker
         lua_remove(L, errfunc);
         return pop<RVal>(L);
     }
-
-    // class helper
-    int meta_get(lua_State *L);
-    int meta_set(lua_State *L);
-    void push_meta(lua_State *L, const char* name);
 
     template<typename T>
     static int eq_cppobj(lua_State *L)
