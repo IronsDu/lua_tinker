@@ -420,12 +420,8 @@ bool lua_tinker::read(lua_State *L, int index)
 {
     if (lua_isboolean(L, index))
         return lua_toboolean(L, index) != 0;
-#if(LUA_VERSION_NUM == 503)
-    else if (lua_isinteger(L, index))
-        return lua_tointeger(L, index) != 0;
-#endif
     else if (lua_isnumber(L, index))
-        return lua_tonumber(L, index) > 0.000001;
+        return lua_tointeger(L, index) != 0;
     else
         return false;
 }
@@ -440,11 +436,7 @@ template<>
 long long lua_tinker::read(lua_State *L, int index)
 {
     if (lua_isnumber(L, index))
-        return (long long)lua_tonumber(L, index);
-#if(LUA_VERSION_NUM == 503)
-    else if (lua_isinteger(L, index))
         return (long long)lua_tointeger(L, index);
-#endif
     else if (lua_isuserdata(L, index))
         return *(long long*)lua_touserdata(L, index);
     else
@@ -454,11 +446,7 @@ template<>
 unsigned long long lua_tinker::read(lua_State *L, int index)
 {
     if (lua_isnumber(L, index))
-        return (unsigned long long)lua_tonumber(L, index);
-#if(LUA_VERSION_NUM == 503)
-    else if (lua_isinteger(L, index))
         return (unsigned long long)lua_tointeger(L, index);
-#endif
     else if (lua_isuserdata(L, index))
         return *(unsigned long long*)lua_touserdata(L, index);
     else
