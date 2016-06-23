@@ -98,7 +98,7 @@ void lua_tinker::init_s64(lua_State *L)
 static int tostring_u64(lua_State *L)
 {
     char temp[64];
-    sprintf(temp, "%lld", *(unsigned long long*)lua_topointer(L, 1));
+    sprintf(temp, "%llu", *(unsigned long long*)lua_topointer(L, 1));
     lua_pushstring(L, temp);
     return 1;
 }
@@ -420,10 +420,12 @@ bool lua_tinker::read(lua_State *L, int index)
 {
     if (lua_isboolean(L, index))
         return lua_toboolean(L, index) != 0;
+#if(LUA_VERSION_NUM == 503)
     else if (lua_isinteger(L, index))
         return lua_tointeger(L, index) != 0;
+#endif
     else if (lua_isnumber(L, index))
-        return lua_tonumber(L, index) != 0;
+        return lua_tonumber(L, index) > 0.000001;
     else
         return false;
 }
@@ -437,10 +439,12 @@ void lua_tinker::read(lua_State *L, int index)
 template<>
 long long lua_tinker::read(lua_State *L, int index)
 {
-    if (lua_isinteger(L, index))
-        return (long long)lua_tointeger(L, index);
-    else if (lua_isnumber(L, index))
+    if (lua_isnumber(L, index))
         return (long long)lua_tonumber(L, index);
+#if(LUA_VERSION_NUM == 503)
+    else if (lua_isinteger(L, index))
+        return (long long)lua_tointeger(L, index);
+#endif
     else if (lua_isuserdata(L, index))
         return *(long long*)lua_touserdata(L, index);
     else
@@ -449,10 +453,12 @@ long long lua_tinker::read(lua_State *L, int index)
 template<>
 unsigned long long lua_tinker::read(lua_State *L, int index)
 {
-    if (lua_isinteger(L, index))
-        return (unsigned long long)lua_tointeger(L, index);
-    else if (lua_isnumber(L, index))
+    if (lua_isnumber(L, index))
         return (unsigned long long)lua_tonumber(L, index);
+#if(LUA_VERSION_NUM == 503)
+    else if (lua_isinteger(L, index))
+        return (unsigned long long)lua_tointeger(L, index);
+#endif
     else if (lua_isuserdata(L, index))
         return *(unsigned long long*)lua_touserdata(L, index);
     else
