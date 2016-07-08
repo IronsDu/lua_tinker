@@ -605,16 +605,11 @@ void lua_tinker::push(lua_State *L, lua_tinker::table ret)
 /*---------------------------------------------------------------------------*/
 /* pop                                                                       */
 /*---------------------------------------------------------------------------*/
-template<>
-void lua_tinker::pop(lua_State *L)
-{
-    lua_pop(L, 1);
-}
 
 template<>
-lua_tinker::table lua_tinker::pop(lua_State *L)
+void lua_tinker::pop(lua_State *L, table& t)
 {
-    return table(L, lua_gettop(L));
+    t = table(L, lua_gettop(L));
 }
 
 /*---------------------------------------------------------------------------*/

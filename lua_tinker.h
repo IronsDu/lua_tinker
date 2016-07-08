@@ -14,6 +14,7 @@
 #include <new>
 #include <string>
 #include <string.h>
+#include <tuple>
 
 extern "C"
 {
@@ -343,10 +344,55 @@ namespace lua_tinker
 
     // pop a value from lua stack
     template<typename T>
-    T pop(lua_State *L) { T t = read<T>(L, -1); lua_pop(L, 1); return t; }
+    void pop(lua_State *L, T& t) { t = read<T>(L, -1); lua_pop(L, 1);}
 
-    template<>	void	pop(lua_State *L);
-    template<>	table	pop(lua_State *L);
+    template<>	void	pop(lua_State *L, table& t);
+
+    template<class Tuple, std::size_t N>
+    struct RecursionReadTuple
+    {
+        static void Read(lua_State *L, Tuple& t, int index)
+        {
+            RecursionReadTuple<Tuple, N - 1>::Read(L, t, index+1);
+            std::get<N - 1>(t) = read<std::remove_reference<decltype(std::get<N - 1>(t))>::type>(L, -index);
+        }
+    };
+
+    template<class Tuple>
+    struct RecursionReadTuple<Tuple, 1>
+    {
+        static void Read(lua_State *L, Tuple& t, int index)
+        {
+            std::get<0>(t) = read<std::remove_reference<decltype(std::get<0>(t))>::type>(L, -index);
+        }
+    };
+
+    template<typename... Args>  void pop(lua_State *L, std::tuple<Args...>& tmp)
+    {
+        RecursionReadTuple<decltype(tmp), sizeof...(Args)>::Read(L, tmp, 1);
+        lua_pop(L, int(sizeof...(Args)));
+    }
+
+    template<typename T>
+    struct MyPop
+    {
+        static T FuckPop(lua_State* L)
+        {
+            T t;
+            pop(L, t);
+            return t;
+        }
+    };
+
+    template<>
+    struct MyPop<void>
+    {
+        static void FuckPop(lua_State* L)
+        {
+            /*  TODO::值得商榷，应该去掉这条lua_pop*/
+            lua_pop(L, 1);
+        }
+    };
 
     static void RecursionRead(lua_State *L, int index)
     {}
@@ -552,10 +598,10 @@ namespace lua_tinker
 #if(LUA_VERSION_NUM == 501)
         lua_pushstring(L, name);
         lua_gettable(L, LUA_GLOBALSINDEX);
-        return pop<T>(L);
+        return MyPop<T>::FuckPop(L);
 #elif(LUA_VERSION_NUM == 503)
         lua_getglobal(L, name);
-        return pop<T>(L);
+        return MyPop<T>::FuckPop(L);
 #endif
     }
 
@@ -591,7 +637,7 @@ namespace lua_tinker
         if (lua_isfunction(L, -1))
         {
             PushArgs(L, args...);
-            lua_pcall(L, sizeof...(Args), 1, errfunc);
+            lua_pcall(L, sizeof...(Args), RValSize<RVal>::value, errfunc);
         }
         else
         {
@@ -599,7 +645,7 @@ namespace lua_tinker
         }
 
         lua_remove(L, errfunc);
-        return pop<RVal>(L);
+        return MyPop<RVal>::FuckPop(L);
     }
 
     template<typename T>
@@ -783,7 +829,7 @@ namespace lua_tinker
                 lua_pushnil(m_L);
             }
 
-            return pop<T>(m_L);
+            return MyPop<T>::FuckPop(m_L);
         }
 
         lua_State*		m_L;
