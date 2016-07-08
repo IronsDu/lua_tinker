@@ -130,6 +130,19 @@ namespace lua_tinker
         static T arg;
         static const bool value = ((sizeof(int_conv_tester(arg)) == sizeof(yes_type)) && (sizeof(vfnd_ptr_tester(add_ptr(arg))) == sizeof(yes_type)));
     };
+
+    template<typename T>
+    struct RValSize
+    {
+        const static int value = 1;
+    };
+
+    template<typename... Args>
+    struct RValSize<std::tuple<Args...>>
+    {
+        const static int value = sizeof...(Args);
+    };
+
     /////////////////////////////////
 
     // from lua
@@ -306,6 +319,28 @@ namespace lua_tinker
     template<>	void push(lua_State *L, unsigned long long ret);
     template<>	void push(lua_State *L, table ret);
 
+    template<class Tuple, std::size_t N>
+    struct TupleWriter {
+        static void write(lua_State *L, const Tuple& t)
+        {
+            TupleWriter<Tuple, N - 1>::write(L, t);
+            push(L, std::get<N - 1>(t));
+        }
+    };
+
+    template<class Tuple>
+    struct TupleWriter < Tuple, 1 > {
+        static void write(lua_State *L, const Tuple& t)
+        {
+            push(L, std::get<0>(t));
+        }
+    };
+
+    template<typename... Args>  void push(lua_State *L, const std::tuple<Args...>& a)
+    {
+        TupleWriter<decltype(a), sizeof...(Args)>::write(L, a);
+    }
+
     // pop a value from lua stack
     template<typename T>
     T pop(lua_State *L) { T t = read<T>(L, -1); lua_pop(L, 1); return t; }
@@ -331,7 +366,7 @@ namespace lua_tinker
         {
             RecursionRead(L, 1, args...);
             RVal ret = (f)(args...);
-            push<RVal>(L, ret);
+            push(L, ret);
         }
     };
 
@@ -353,7 +388,7 @@ namespace lua_tinker
         {
             auto f = upvalue_<RVal(*)(Args...)>(L);
             HelpEval<RVal, Args...>::eval(f, L, Args()...);
-            return 1;
+            return RValSize<RVal>::value;
         }
     };
 
@@ -399,7 +434,7 @@ namespace lua_tinker
         {
             RecursionRead(L, 2, args...);
             RVal ret = (p->*f)(args...);
-            push<RVal>(L, ret);
+            push(L, ret);
         }
     };
 
@@ -422,7 +457,7 @@ namespace lua_tinker
             P* p = ((P*)read<T*>(L, 1));
             auto f = upvalue_<RVal(P::*)(Args...)>(L);
             HelpMemEval<RVal, P, Args...>::eval(p, f, L, Args()...);
-            return 1;
+            return RValSize<RVal>::value;
         }
     };
 
