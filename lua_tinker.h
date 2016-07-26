@@ -426,6 +426,12 @@ namespace lua_tinker
         }
     };
 
+    template<typename T>
+    T GenericConstruction()
+    {
+        return T();
+    }
+
     // functor (with return value)
     template<typename RVal, typename ...Args>
     struct functor
@@ -433,7 +439,7 @@ namespace lua_tinker
         static int invoke(lua_State *L)
         {
             auto f = upvalue_<RVal(*)(Args...)>(L);
-            HelpEval<RVal, Args...>::eval(f, L, Args()...);
+            HelpEval<RVal, Args...>::eval(f, L, GenericConstruction<Args>()...);
             return RValSize<RVal>::value;
         }
     };
