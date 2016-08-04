@@ -15,6 +15,7 @@
 #include <string>
 #include <string.h>
 #include <tuple>
+#include <type_traits>
 
 extern "C"
 {
@@ -51,6 +52,7 @@ namespace lua_tinker
     // type trait
     template<typename T> struct class_name;
     struct table;
+    struct luaValueRef;
 
     template<bool C, typename A, typename B> struct if_ {};
     template<typename A, typename B>		struct if_ < true, A, B > { typedef A type; };
@@ -294,6 +296,7 @@ namespace lua_tinker
     template<>	table				read(lua_State *L, int index);
     template<>	std::string		    read(lua_State *L, int index);
     template<>	lua_State*		    read(lua_State *L, int index);
+    template<>  luaValueRef         read(lua_State* L, int index);
 
     // push a value to lua stack 
     template<typename T>
@@ -408,18 +411,17 @@ namespace lua_tinker
     template<typename RVal, typename ...Args>
     struct HelpEval
     {
-        static  void    eval(RVal(*f)(Args...), lua_State *L, Args&&... args)
+        static  void    eval(RVal(*f)(Args...), lua_State *L, std::decay_t<Args>&&... args)
         {
             RecursionRead(L, 1, args...);
-            RVal ret = (f)(args...);
-            push(L, ret);
+            push(L, (f)(args...));
         }
     };
 
     template<typename ...Args>
     struct HelpEval < void, Args... >
     {
-        static  void    eval(void(*f)(Args...), lua_State *L, Args&&... args)
+        static  void    eval(void(*f)(Args...), lua_State *L, std::decay_t<Args>&&... args)
         {
             RecursionRead(L, 1, args...);
             (f)(args...);
@@ -427,10 +429,22 @@ namespace lua_tinker
     };
 
     template<typename T>
-    T GenericConstruction()
+    struct GenericConstruction
     {
-        return T();
-    }
+        static T New()
+        {
+            return T();
+        }
+    };
+
+    template<typename T>
+    struct GenericConstruction<const T&>
+    {
+        static T New()
+        {
+            return T();
+        }
+    };
 
     // functor (with return value)
     template<typename RVal, typename ...Args>
@@ -439,7 +453,7 @@ namespace lua_tinker
         static int invoke(lua_State *L)
         {
             auto f = upvalue_<RVal(*)(Args...)>(L);
-            HelpEval<RVal, Args...>::eval(f, L, GenericConstruction<Args>()...);
+            HelpEval<RVal, Args...>::eval(f, L, GenericConstruction<Args>::New()...);
             return RValSize<RVal>::value;
         }
     };
@@ -450,7 +464,7 @@ namespace lua_tinker
         static int invoke(lua_State *L)
         {
             auto f = upvalue_<void(*)(Args...)>(L);
-            HelpEval<void, Args...>::eval(f, L, Args()...);
+            HelpEval<void, Args...>::eval(f, L, GenericConstruction<Args>::New()...);
             return 0;
         }
     };
@@ -482,7 +496,7 @@ namespace lua_tinker
     template<typename RVal, typename P, typename ...Args>
     struct HelpMemEval
     {
-        static  void    eval(P* p, RVal(P::*f)(Args...), lua_State *L, Args&&... args)
+        static  void    eval(P* p, RVal(P::*f)(Args...), lua_State *L, std::decay_t<Args>&&... args)
         {
             RecursionRead(L, 2, args...);
             RVal ret = (p->*f)(args...);
@@ -493,7 +507,7 @@ namespace lua_tinker
     template<typename P, typename ...Args>
     struct HelpMemEval < void, P, Args... >
     {
-        static  void    eval(P* p, void(P::*f)(Args...), lua_State *L, Args&&... args)
+        static  void    eval(P* p, void(P::*f)(Args...), lua_State *L, std::decay_t<Args>&&... args)
         {
             RecursionRead(L, 2, args...);
             (p->*f)(args...);
@@ -508,7 +522,7 @@ namespace lua_tinker
         {
             P* p = ((P*)read<T*>(L, 1));
             auto f = upvalue_<RVal(P::*)(Args...)>(L);
-            HelpMemEval<RVal, P, Args...>::eval(p, f, L, Args()...);
+            HelpMemEval<RVal, P, Args...>::eval(p, f, L, GenericConstruction<Args>::New()...);
             return RValSize<RVal>::value;
         }
     };
@@ -520,7 +534,7 @@ namespace lua_tinker
         {
             P* p = ((P*)read<T*>(L, 1));
             auto f = upvalue_<void(P::*)(Args...)>(L);
-            HelpMemEval<void, P, Args...>::eval(p, f, L, Args()...);
+            HelpMemEval<void, P, Args...>::eval(p, f, L, GenericConstruction<Args>::New()...);
             return 0;
         }
     };
@@ -541,7 +555,7 @@ namespace lua_tinker
     template<typename T, typename ...Args>
     struct ConstructorEval
     {
-        static  void    eval(void* memory, lua_State *L, Args&&... args)
+        static  void    eval(void* memory, lua_State *L, std::decay_t<Args>&&... args)
         {
             RecursionRead(L, 1, args...);
             new(memory)val2user<T>(args...);
@@ -553,7 +567,7 @@ namespace lua_tinker
     int constructor(lua_State *L)
     {
         void* m = lua_newuserdata(L, sizeof(val2user<T>));
-        ConstructorEval<T, Args...>::eval(m, L, Args()...);
+        ConstructorEval<T, Args...>::eval(m, L, GenericConstruction<Args>::New()...);
         push_meta(L, class_name<typename class_type<T>::type>::name());
         lua_setmetatable(L, -2);
 
@@ -799,6 +813,21 @@ namespace lua_tinker
             return temp;
         }
     };
+
+    struct luaValueRef
+    {
+        lua_State     *L;
+        int 		   rindex;
+    };
+
+    static void releaseLuaValueRef(luaValueRef ref)
+    {
+        if (ref.rindex != LUA_REFNIL){
+            luaL_unref(ref.L, LUA_REGISTRYINDEX, ref.rindex);
+            ref.L = nullptr;
+            ref.rindex = LUA_REFNIL;
+        }
+    }
 
     // Table Object on Stack
     struct table_obj

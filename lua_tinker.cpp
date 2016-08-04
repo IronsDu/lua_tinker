@@ -465,6 +465,18 @@ lua_State* lua_tinker::read(lua_State *L, int index)
     return lua_tothread(L, index);
 }
 
+template<>
+lua_tinker::luaValueRef lua_tinker::read(lua_State *L, int index)
+{
+    lua_tinker::luaValueRef ref;
+    lua_pushvalue(L, index);
+    ref.rindex = luaL_ref(L, LUA_REGISTRYINDEX);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_MAINTHREAD);
+    ref.L = lua_tothread(L, -1);
+    lua_pop(L, 1);
+    return ref;
+}
+
 /*---------------------------------------------------------------------------*/
 /* push                                                                      */
 /*---------------------------------------------------------------------------*/
