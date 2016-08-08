@@ -272,7 +272,7 @@ void lua_tinker::print_error(lua_State *L, const char* fmt, ...)
 #elif(LUA_VERSION_NUM == 503)
     lua_getglobal(L, "_ALERT");
 #endif
-    
+
     if (lua_isfunction(L, -1))
     {
         lua_pushstring(L, text);
@@ -294,33 +294,33 @@ void lua_tinker::enum_stack(lua_State *L)
     {
         switch (lua_type(L, i))
         {
-            case LUA_TNIL:
-                print_error(L, "\t%s", lua_typename(L, lua_type(L, i)));
-                break;
-            case LUA_TBOOLEAN:
-                print_error(L, "\t%s	%s", lua_typename(L, lua_type(L, i)), lua_toboolean(L, i) ? "true" : "false");
-                break;
-            case LUA_TLIGHTUSERDATA:
-                print_error(L, "\t%s	0x%08p", lua_typename(L, lua_type(L, i)), lua_topointer(L, i));
-                break;
-            case LUA_TNUMBER:
-                print_error(L, "\t%s	%f", lua_typename(L, lua_type(L, i)), lua_tonumber(L, i));
-                break;
-            case LUA_TSTRING:
-                print_error(L, "\t%s	%s", lua_typename(L, lua_type(L, i)), lua_tostring(L, i));
-                break;
-            case LUA_TTABLE:
-                print_error(L, "\t%s	0x%08p", lua_typename(L, lua_type(L, i)), lua_topointer(L, i));
-                break;
-            case LUA_TFUNCTION:
-                print_error(L, "\t%s()	0x%08p", lua_typename(L, lua_type(L, i)), lua_topointer(L, i));
-                break;
-            case LUA_TUSERDATA:
-                print_error(L, "\t%s	0x%08p", lua_typename(L, lua_type(L, i)), lua_topointer(L, i));
-                break;
-            case LUA_TTHREAD:
-                print_error(L, "\t%s", lua_typename(L, lua_type(L, i)));
-                break;
+        case LUA_TNIL:
+            print_error(L, "\t%s", lua_typename(L, lua_type(L, i)));
+            break;
+        case LUA_TBOOLEAN:
+            print_error(L, "\t%s	%s", lua_typename(L, lua_type(L, i)), lua_toboolean(L, i) ? "true" : "false");
+            break;
+        case LUA_TLIGHTUSERDATA:
+            print_error(L, "\t%s	0x%08p", lua_typename(L, lua_type(L, i)), lua_topointer(L, i));
+            break;
+        case LUA_TNUMBER:
+            print_error(L, "\t%s	%f", lua_typename(L, lua_type(L, i)), lua_tonumber(L, i));
+            break;
+        case LUA_TSTRING:
+            print_error(L, "\t%s	%s", lua_typename(L, lua_type(L, i)), lua_tostring(L, i));
+            break;
+        case LUA_TTABLE:
+            print_error(L, "\t%s	0x%08p", lua_typename(L, lua_type(L, i)), lua_topointer(L, i));
+            break;
+        case LUA_TFUNCTION:
+            print_error(L, "\t%s()	0x%08p", lua_typename(L, lua_type(L, i)), lua_topointer(L, i));
+            break;
+        case LUA_TUSERDATA:
+            print_error(L, "\t%s	0x%08p", lua_typename(L, lua_type(L, i)), lua_topointer(L, i));
+            break;
+        case LUA_TTHREAD:
+            print_error(L, "\t%s", lua_typename(L, lua_type(L, i)));
+            break;
         }
     }
 }
@@ -468,6 +468,13 @@ lua_State* lua_tinker::read(lua_State *L, int index)
 template<>
 lua_tinker::luaValueRef lua_tinker::read(lua_State *L, int index)
 {
+#if(LUA_VERSION_NUM == 501)
+    lua_tinker::luaValueRef ref;
+    lua_pushvalue(L, index);
+    ref.rindex = luaL_ref(L, LUA_REGISTRYINDEX);
+    ref.L = nullptr;
+    return ref;
+#elif(LUA_VERSION_NUM == 503)
     lua_tinker::luaValueRef ref;
     lua_pushvalue(L, index);
     ref.rindex = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -475,6 +482,7 @@ lua_tinker::luaValueRef lua_tinker::read(lua_State *L, int index)
     ref.L = lua_tothread(L, -1);
     lua_pop(L, 1);
     return ref;
+#endif
 }
 
 /*---------------------------------------------------------------------------*/
