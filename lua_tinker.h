@@ -411,7 +411,7 @@ namespace lua_tinker
     template<typename RVal, typename ...Args>
     struct HelpEval
     {
-        static  void    eval(RVal(*f)(Args...), lua_State *L, std::decay_t<Args>&&... args)
+        static  void    eval(RVal(*f)(Args...), lua_State *L, typename std::decay<Args>::type&&... args)
         {
             RecursionRead(L, 1, args...);
             push(L, (f)(args...));
@@ -421,7 +421,7 @@ namespace lua_tinker
     template<typename ...Args>
     struct HelpEval < void, Args... >
     {
-        static  void    eval(void(*f)(Args...), lua_State *L, std::decay_t<Args>&&... args)
+        static  void    eval(void(*f)(Args...), lua_State *L, typename std::decay<Args>::type&&... args)
         {
             RecursionRead(L, 1, args...);
             (f)(args...);
@@ -496,7 +496,7 @@ namespace lua_tinker
     template<typename RVal, typename P, typename ...Args>
     struct HelpMemEval
     {
-        static  void    eval(P* p, RVal(P::*f)(Args...), lua_State *L, std::decay_t<Args>&&... args)
+        static  void    eval(P* p, RVal(P::*f)(Args...), lua_State *L, typename std::decay<Args>::type&&... args)
         {
             RecursionRead(L, 2, args...);
             RVal ret = (p->*f)(args...);
@@ -507,7 +507,7 @@ namespace lua_tinker
     template<typename P, typename ...Args>
     struct HelpMemEval < void, P, Args... >
     {
-        static  void    eval(P* p, void(P::*f)(Args...), lua_State *L, std::decay_t<Args>&&... args)
+        static  void    eval(P* p, void(P::*f)(Args...), lua_State *L, typename std::decay<Args>::type&&... args)
         {
             RecursionRead(L, 2, args...);
             (p->*f)(args...);
@@ -555,7 +555,7 @@ namespace lua_tinker
     template<typename T, typename ...Args>
     struct ConstructorEval
     {
-        static  void    eval(void* memory, lua_State *L, std::decay_t<Args>&&... args)
+        static  void    eval(void* memory, lua_State *L, typename std::decay<Args>::type&&... args)
         {
             RecursionRead(L, 1, args...);
             new(memory)val2user<T>(args...);
